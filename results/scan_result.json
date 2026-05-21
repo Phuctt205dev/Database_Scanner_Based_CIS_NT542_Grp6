@@ -1,0 +1,65 @@
+[
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.1",
+        "policy": "Ensure 'Server Authentication' is set to 'Windows Authentication Mode'",
+        "status": "Violate",
+        "details": "Đang dùng Mixed Mode (Violate)"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.8",
+        "policy": "Ensure only default permissions are granted to the public server role",
+        "status": "Compliance",
+        "details": "Phát hiện 0 quyền dư thừa được cấp cho role public"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.9",
+        "policy": "Ensure Windows BUILTIN groups are not SQL Logins",
+        "status": "Violate",
+        "details": "Phát hiện 1 nhóm BUILTIN đang làm SQL Login"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.10",
+        "policy": "Ensure Windows local groups are not SQL Logins",
+        "status": "Compliance",
+        "details": "Phát hiện 0 nhóm Local được cấu hình làm SQL Login"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.11",
+        "policy": "Ensure public role in msdb is not granted access to SQL Agent proxies",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.13",
+        "policy": "Ensure no admin role membership in MSDB database",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.2",
+        "policy": "Ensure CONNECT permissions on 'guest' is Revoked",
+        "status": "Compliance",
+        "details": "Guest CONNECT permission revoked in all databases"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.3",
+        "policy": "Ensure 'Orphaned Users' are Dropped",
+        "status": "Compliance",
+        "details": "No orphaned users found in all databases"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.4",
+        "policy": "Ensure SQL Authentication is not used in contained DB",
+        "status": "Compliance",
+        "details": "No SQL Authentication users found in contained databases"
+    }
+]

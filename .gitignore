@@ -1,0 +1,4 @@
+mariadb-12.2.2-winx64.msi
+.vscode/
+scanner/__pycache__/
+testing/

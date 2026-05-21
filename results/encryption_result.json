@@ -1,0 +1,30 @@
+[
+    {
+        "group": "Encryption",
+        "rule_id": "7.1",
+        "policy": "Ensure Symmetric Key is AES_128 or higher",
+        "status": "Compliance",
+        "details": "Symmetric Keys an toàn: [\"DB 'contained_lab': SymmetricKey (AES_256)\", \"DB 'contained_lab': StrongSymmetricKey (AES_256)\", \"DB 'CLRTestDB': StrongSymmetricKey (AES_256)\", \"DB 'EncryptionLab': StrongSymmetricKey (AES_256)\"]"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.2",
+        "policy": "Ensure Asymmetric Key Size >= 2048",
+        "status": "Compliance",
+        "details": "Asymmetric Keys an toàn: [\"DB 'contained_lab': StrongAsymmetricKey (2048 bits)\", \"DB 'CLRTestDB': StrongAsymmetricKey (2048 bits)\", \"DB 'EncryptionLab': StrongAsymmetricKey (2048 bits)\"]"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.3",
+        "policy": "Ensure Database Backups are Encrypted",
+        "status": "Compliance",
+        "details": "Tất cả backup đều an toàn"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.4",
+        "policy": "Ensure Network Encryption is Configured and Enabled",
+        "status": "Compliance",
+        "details": "Network encryption được bật"
+    }
+]

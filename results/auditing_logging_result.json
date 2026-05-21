@@ -1,0 +1,30 @@
+[
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.1",
+        "policy": "Ensure 'Maximum number of error log files' is >= 12",
+        "status": "Compliance",
+        "details": "Số lượng Error Logs giữ lại: 12"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.2",
+        "policy": "Ensure 'Default Trace Enabled' is set to '1'",
+        "status": "Compliance",
+        "details": "Giá trị Default Trace hiện tại: 1"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.3",
+        "policy": "Ensure 'Login Auditing' is set to 'failed logins'",
+        "status": "Compliance",
+        "details": "Cấu hình Audit level hiện hành: failure"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.4",
+        "policy": "Ensure SQL Server Audit is configured properly",
+        "status": "Compliance",
+        "details": "Tất cả audit requirements đều tuân thủ"
+    }
+]

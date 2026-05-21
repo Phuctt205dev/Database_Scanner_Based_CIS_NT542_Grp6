@@ -1,0 +1,9 @@
+[
+    {
+        "group": "Application Development",
+        "rule_id": "6.2",
+        "policy": "Ensure 'CLR Assembly Permission Set' is set to 'SAFE_ACCESS' for All CLR Assemblies",
+        "status": "Compliance",
+        "details": "Tất cả user-defined CLR Assemblies đều tuân thủ (SAFE_ACCESS)"
+    }
+]

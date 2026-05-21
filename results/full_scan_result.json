@@ -1,0 +1,261 @@
+[
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.1",
+        "policy": "Ensure 'Ad Hoc Distributed Queries' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.2",
+        "policy": "Ensure 'clr enabled' is set to '0'",
+        "status": "Violate",
+        "details": "Giá trị hiện tại: 1"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.3",
+        "policy": "Ensure 'cross db ownership chaining' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.4",
+        "policy": "Ensure 'Database Mail XPs' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.5",
+        "policy": "Ensure 'Ole Automation Procedures' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.6",
+        "policy": "Ensure 'remote access' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.8",
+        "policy": "Ensure 'scan for startup procs' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.17",
+        "policy": "Ensure 'clr strict security' is set to '1'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 1"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.7",
+        "policy": "Ensure 'Remote Admin Connections' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.11",
+        "policy": "Ensure SQL Server is configured to use non-standard ports",
+        "status": "Compliance",
+        "details": "Số lượng port 1433 được tìm thấy: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.12",
+        "policy": "Ensure 'Hide Instance' option is set to 'Yes'",
+        "status": "Compliance",
+        "details": "Instance đang bị ẩn (An toàn)"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.9",
+        "policy": "Ensure 'Trustworthy' Database Property is set to 'Off'",
+        "status": "Violate",
+        "details": "Các DB vi phạm: ['CLRTestDB']"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.13",
+        "policy": "Ensure the 'sa' Login Account is set to 'Disabled'",
+        "status": "Compliance",
+        "details": "Tài khoản gốc đã được vô hiệu hóa"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.14",
+        "policy": "Ensure the 'sa' Login Account has been renamed",
+        "status": "Compliance",
+        "details": "Tên tài khoản gốc hiện tại: secure_admin"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.15",
+        "policy": "Ensure 'AUTO_CLOSE' is set to 'OFF' on contained databases",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.16",
+        "policy": "Ensure no login exists with the name 'sa'",
+        "status": "Compliance",
+        "details": "Không tồn tại tài khoản tên 'sa'"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.8",
+        "policy": "Ensure only default permissions are granted to the public server role",
+        "status": "Compliance",
+        "details": "Phát hiện 0 quyền dư thừa được cấp cho role public"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.9",
+        "policy": "Ensure Windows BUILTIN groups are not SQL Logins",
+        "status": "Compliance",
+        "details": "Phát hiện 0 nhóm BUILTIN đang làm SQL Login"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.10",
+        "policy": "Ensure Windows local groups are not SQL Logins",
+        "status": "Compliance",
+        "details": "Phát hiện 0 nhóm Local được cấu hình làm SQL Login"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.11",
+        "policy": "Ensure public role in msdb is not granted access to SQL Agent proxies",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.13",
+        "policy": "Ensure no admin role membership in MSDB database",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.2",
+        "policy": "Ensure CONNECT permissions on 'guest' is Revoked",
+        "status": "Compliance",
+        "details": "Guest CONNECT permission revoked in all databases"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.3",
+        "policy": "Ensure 'Orphaned Users' are Dropped",
+        "status": "Compliance",
+        "details": "No orphaned users found in all databases"
+    },
+    {
+        "group": "Authentication & Authorization",
+        "rule_id": "3.4",
+        "policy": "Ensure SQL Authentication is not used in contained DB",
+        "status": "Compliance",
+        "details": "No SQL Authentication users found in contained databases"
+    },
+    {
+        "group": "Password Policies",
+        "rule_id": "4.1",
+        "policy": "Ensure 'MUST_CHANGE' Option is set to 'ON' for all SQL authenticated logins",
+        "status": "Violate",
+        "details": "Các tài khoản vi phạm MUST_CHANGE: [('secure_admin',), ('##MS_PolicyEventProcessingLogin##',), ('##MS_PolicyTsqlExecutionLogin##',), ('weakuser',), ('scanner_user',)]"
+    },
+    {
+        "group": "Password Policies",
+        "rule_id": "4.2",
+        "policy": "Ensure 'CHECK_EXPIRATION' is 'ON' for Sysadmin/CONTROL SERVER",
+        "status": "Compliance",
+        "details": "Tất cả tài khoản đều tuân thủ"
+    },
+    {
+        "group": "Password Policies",
+        "rule_id": "4.3",
+        "policy": "Ensure 'CHECK_POLICY' Option is set to 'ON'",
+        "status": "Compliance",
+        "details": "Tất cả tài khoản đều tuân thủ"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.1",
+        "policy": "Ensure 'Maximum number of error log files' is >= 12",
+        "status": "Compliance",
+        "details": "Số lượng Error Logs giữ lại: 12"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.2",
+        "policy": "Ensure 'Default Trace Enabled' is set to '1'",
+        "status": "Compliance",
+        "details": "Giá trị Default Trace hiện tại: 1"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.3",
+        "policy": "Ensure 'Login Auditing' is set to 'failed logins'",
+        "status": "Compliance",
+        "details": "Cấu hình Audit level hiện hành: failure"
+    },
+    {
+        "group": "Auditing and Logging",
+        "rule_id": "5.4",
+        "policy": "Ensure SQL Server Audit is configured properly",
+        "status": "Compliance",
+        "details": "Tất cả audit requirements đều tuân thủ"
+    },
+    {
+        "group": "Application Development",
+        "rule_id": "6.2",
+        "policy": "Ensure 'CLR Assembly Permission Set' is set to 'SAFE_ACCESS' for All CLR Assemblies",
+        "status": "Compliance",
+        "details": "Tất cả user-defined CLR Assemblies đều tuân thủ (SAFE_ACCESS)"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.1",
+        "policy": "Ensure Symmetric Key is AES_128 or higher",
+        "status": "Compliance",
+        "details": "Không phát hiện Symmetric Key yếu"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.2",
+        "policy": "Ensure Asymmetric Key Size >= 2048",
+        "status": "Compliance",
+        "details": "Không phát hiện Asymmetric Key yếu"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.3",
+        "policy": "Ensure Database Backups are Encrypted",
+        "status": "Compliance",
+        "details": "Tất cả backup đều an toàn"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.4",
+        "policy": "Ensure Network Encryption is Configured and Enabled",
+        "status": "Compliance",
+        "details": "Network encryption được bật"
+    },
+    {
+        "group": "Encryption",
+        "rule_id": "7.5",
+        "policy": "Ensure Databases are Encrypted with TDE",
+        "status": "Violate",
+        "details": "Các Database chưa mã hóa TDE: ['contained_lab', 'CLRTestDB', 'EncryptionLab']"
+    }
+]

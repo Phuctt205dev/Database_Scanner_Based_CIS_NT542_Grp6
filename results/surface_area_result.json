@@ -1,0 +1,114 @@
+[
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.1",
+        "policy": "Ensure 'Ad Hoc Distributed Queries' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.2",
+        "policy": "Ensure 'clr enabled' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.3",
+        "policy": "Ensure 'cross db ownership chaining' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.4",
+        "policy": "Ensure 'Database Mail XPs' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.5",
+        "policy": "Ensure 'Ole Automation Procedures' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.6",
+        "policy": "Ensure 'remote access' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.8",
+        "policy": "Ensure 'scan for startup procs' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.17",
+        "policy": "Ensure 'clr strict security' is set to '1'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 1"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.7",
+        "policy": "Ensure 'Remote Admin Connections' is set to '0'",
+        "status": "Compliance",
+        "details": "Giá trị hiện tại: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.11",
+        "policy": "Ensure SQL Server is configured to use non-standard ports",
+        "status": "Compliance",
+        "details": "Số lượng port 1433 được tìm thấy: 0"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.12",
+        "policy": "Ensure 'Hide Instance' option is set to 'Yes'",
+        "status": "Compliance",
+        "details": "Instance đang bị ẩn (An toàn)"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.9",
+        "policy": "Ensure 'Trustworthy' Database Property is set to 'Off'",
+        "status": "Compliance",
+        "details": "Tất cả DB đều tắt Trustworthy"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.13",
+        "policy": "Ensure the 'sa' Login Account is set to 'Disabled'",
+        "status": "Compliance",
+        "details": "Tài khoản gốc đã được vô hiệu hóa"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.14",
+        "policy": "Ensure the 'sa' Login Account has been renamed",
+        "status": "Compliance",
+        "details": "Tên tài khoản gốc hiện tại: secure_admin"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.15",
+        "policy": "Ensure 'AUTO_CLOSE' is set to 'OFF' on contained databases",
+        "status": "Compliance",
+        "details": "An toàn"
+    },
+    {
+        "group": "Surface Area Reduction",
+        "rule_id": "2.16",
+        "policy": "Ensure no login exists with the name 'sa'",
+        "status": "Compliance",
+        "details": "Không tồn tại tài khoản tên 'sa'"
+    }
+]
