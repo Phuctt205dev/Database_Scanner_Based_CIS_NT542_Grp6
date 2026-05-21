@@ -1,0 +1,229 @@
+---
+- name: Policy Driven CIS Remediation
+  hosts: sqlservers
+
+  vars:
+
+    ############################################################
+    # SCAN RESULT
+    ############################################################
+
+    scan_result_file: "/home/truongtrongphuc/nt542-db_scanner-gr06/results/scan_result.json"
+
+
+    ############################################################
+    # GENERIC SQL CONFIGURATION RULES
+    ############################################################
+
+    config_rules:
+
+      "2.1":
+        config_name: "Ad Hoc Distributed Queries"
+        value: 0
+
+      "2.2":
+        config_name: "clr enabled"
+        value: 0
+
+      "2.3":
+        config_name: "cross db ownership chaining"
+        value: 0
+
+      "2.4":
+        config_name: "Database Mail XPs"
+        value: 0
+
+      "2.5":
+        config_name: "Ole Automation Procedures"
+        value: 0
+
+      "2.6":
+        config_name: "remote access"
+        value: 0
+
+      "2.7":
+        config_name: "remote admin connections"
+        value: 0
+
+      "2.8":
+        config_name: "scan for startup procs"
+        value: 0
+
+      "2.17":
+        config_name: "clr strict security"
+        value: 1
+
+
+  tasks:
+
+    ############################################################
+    # LOAD JSON
+    ############################################################
+
+    - name: Read scan result JSON
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ lookup('file', scan_result_file) | from_json }}"
+
+    - name: Extract violated rule IDs
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Show violated rules
+      debug:
+        var: violated_rules
+
+
+    ############################################################
+    # GENERIC SQL CONFIGURATION REMEDIATION
+    ############################################################
+
+    - name: Remediate SQL configuration rules
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        EXEC sp_configure 'show advanced options', 1;
+        RECONFIGURE;
+        EXEC sp_configure '{{ item.value.config_name }}', {{ item.value.value }};
+        RECONFIGURE;
+        "
+      loop: "{{ config_rules | dict2items }}"
+      loop_control:
+        label: "{{ item.key }} - {{ item.value.config_name }}"
+      when: item.key in violated_rules
+
+
+    ############################################################
+    # RULE 2.11
+    # NON-STANDARD SQL PORT
+    ############################################################
+
+    - name: Disable dynamic ports
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQLServer\SuperSocketNetLib\Tcp\IPAll
+        name: TcpDynamicPorts
+        data: ""
+        type: string
+      when: "'2.11' in violated_rules"
+
+    - name: Set fixed SQL port 51433
+      ansible.windows.win_regedit:
+        path: HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\MSSQL16.SQLEXPRESS\MSSQLServer\SuperSocketNetLib\Tcp\IPAll
+        name: TcpPort
+        data: "51433"
+        type: string
+      when: "'2.11' in violated_rules"
+
+    - name: Open firewall port 51433
+      community.windows.win_firewall_rule:
+        name: SQL Server 51433
+        localport: 51433
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: yes
+      when: "'2.11' in violated_rules"
+
+    - name: Restart SQL Server Express service
+      ansible.windows.win_service:
+        name: MSSQL$SQLEXPRESS
+        state: restarted
+      when: "'2.11' in violated_rules"
+
+    - name: Wait for SQL Server startup
+      pause:
+        seconds: 15
+      when: "'2.11' in violated_rules"
+
+
+    ############################################################
+    # RULE 2.12
+    # HIDE INSTANCE
+    ############################################################
+
+    - name: Hide SQL Server instance
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost,51433 -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        EXEC master.sys.xp_instance_regwrite
+          @rootkey = N'HKEY_LOCAL_MACHINE',
+          @key = N'SOFTWARE\Microsoft\Microsoft SQL Server\MSSQLServer\SuperSocketNetLib',
+          @value_name = N'HideInstance',
+          @type = N'REG_DWORD',
+          @value = 1;
+        "
+      when: "'2.12' in violated_rules"
+
+
+    ############################################################
+    # RULE 2.13
+    # DISABLE sa LOGIN
+    ############################################################
+
+    - name: Disable sa login
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost,51433 -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        ALTER LOGIN sa DISABLE;
+        "
+      when: "'2.13' in violated_rules"
+
+
+    ############################################################
+    # RULE 2.14 + 2.16
+    # RENAME sa LOGIN
+    ############################################################
+
+    - name: Rename sa login
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost,51433 -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        ALTER LOGIN sa WITH NAME = secure_admin;
+        "
+      when:
+        - "'2.14' in violated_rules or '2.16' in violated_rules"
+
+
+    ############################################################
+    # RULE 2.15
+    # AUTO_CLOSE OFF
+    ############################################################
+
+    - name: Disable AUTO_CLOSE on contained databases
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost,51433 -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql += '
+        ALTER DATABASE [' + name + '] SET AUTO_CLOSE OFF;'
+        FROM sys.databases
+        WHERE containment <> 0
+          AND is_auto_close_on = 1;
+
+        EXEC(@sql);
+        "
+      when: "'2.15' in violated_rules"
+
+
+    ############################################################
+    # RULE 2.9
+    # TRUSTWORTHY OFF
+    ############################################################
+
+    - name: Disable TRUSTWORTHY on databases
+      ansible.windows.win_shell: |
+        sqlcmd -S localhost,51433 -U {{ sql_username }} -P "{{ sql_password }}" -Q "
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql += '
+        ALTER DATABASE [' + name + '] SET TRUSTWORTHY OFF;'
+        FROM sys.databases
+        WHERE is_trustworthy_on = 1
+          AND name != 'msdb';
+
+        EXEC(@sql);
+        "
+      when: "'2.9' in violated_rules"

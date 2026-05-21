@@ -1,0 +1,209 @@
+---
+- name: Make Authentication & Authorization Insecure
+  hosts: sqlservers
+  gather_facts: no
+
+  tasks:
+
+    # =========================================================
+    # Rule 3.2
+    # Grant CONNECT to guest
+    # =========================================================
+
+    - name: Rule 3.2 - Enable guest CONNECT
+      win_shell: |
+        $query = @"
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql += '
+        USE [' + name + '];
+        GRANT CONNECT TO guest;'
+        FROM sys.databases
+        WHERE name NOT IN ('master','tempdb','msdb');
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Rule 3.3
+    # Create orphaned user
+    # =========================================================
+
+    - name: Rule 3.3 - Create orphaned user
+      win_shell: |
+        $query = @"
+        USE master;
+
+        IF NOT EXISTS (
+            SELECT * FROM sys.server_principals
+            WHERE name = 'orphan_test_login'
+        )
+        BEGIN
+            CREATE LOGIN orphan_test_login
+            WITH PASSWORD = 'OrphanUser123!';
+        END
+
+        USE model;
+
+        IF NOT EXISTS (
+            SELECT * FROM sys.database_principals
+            WHERE name = 'orphan_test_user'
+        )
+        BEGIN
+            CREATE USER orphan_test_user
+            FOR LOGIN orphan_test_login;
+        END
+
+        DROP LOGIN orphan_test_login;
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Rule 3.4
+    # Create contained SQL auth user
+    # =========================================================
+
+    - name: Rule 3.4 - Create contained DB SQL auth user
+      win_shell: |
+        $query = @"
+        ALTER DATABASE model
+        SET CONTAINMENT = PARTIAL;
+
+        USE model;
+
+        IF NOT EXISTS (
+            SELECT * FROM sys.database_principals
+            WHERE name = 'contained_sql_user'
+        )
+        BEGIN
+            CREATE USER contained_sql_user
+            WITH PASSWORD = 'ContainedUser123!';
+        END
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+        
+    # =========================================================
+    # Rule 3.8
+    # Grant dangerous permission to public role
+    # =========================================================
+
+    - name: Rule 3.8 - Grant dangerous permission to public
+      win_shell: |
+        $query = @"
+        GRANT VIEW SERVER STATE TO public;
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Rule 3.9
+    # Create BUILTIN login
+    # =========================================================
+
+    - name: Rule 3.9 - Add BUILTIN Administrators login
+      win_shell: |
+        $query = @"
+        IF NOT EXISTS (
+            SELECT * FROM sys.server_principals
+            WHERE name = 'BUILTIN\Administrators'
+        )
+        BEGIN
+            CREATE LOGIN [BUILTIN\Administrators]
+            FROM WINDOWS;
+        END
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Rule 3.10
+    # Create local Windows group login
+    # =========================================================
+
+    - name: Rule 3.10 - Add local Windows group login
+      win_shell: |
+        $group = "$env:COMPUTERNAME\TestLocalGroup"
+
+        try {
+            net localgroup TestLocalGroup /add
+        } catch {}
+
+        $query = @"
+        IF NOT EXISTS (
+            SELECT * FROM sys.server_principals
+            WHERE name = '$group'
+        )
+        BEGIN
+            CREATE LOGIN [$group]
+            FROM WINDOWS;
+        END
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Rule 3.11
+    # Grant public access to proxy
+    # =========================================================
+
+    - name: Rule 3.11 - Grant public access to SQL Agent proxy
+      win_shell: |
+        $query = @"
+        USE msdb;
+
+        IF NOT EXISTS (
+            SELECT * FROM dbo.sysproxies
+            WHERE name = 'test_proxy'
+        )
+        BEGIN
+            EXEC dbo.sp_add_proxy
+                @proxy_name='test_proxy',
+                @enabled=1;
+        END
+
+        EXEC dbo.sp_grant_login_to_proxy
+            @proxy_name='test_proxy',
+            @login_name='public';
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+      ignore_errors: yes
+
+    # =========================================================
+    # Rule 3.13
+    # Add dangerous msdb role membership
+    # =========================================================
+
+    - name: Rule 3.13 - Add dangerous msdb role membership
+      win_shell: |
+        $query = @"
+        USE msdb;
+
+        IF NOT EXISTS (
+            SELECT * FROM sys.database_principals
+            WHERE name = 'test_msdb_user'
+        )
+        BEGIN
+            CREATE USER test_msdb_user
+            WITHOUT LOGIN;
+        END
+
+        EXEC sp_addrolemember
+            'db_owner',
+            'test_msdb_user';
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+
+    # =========================================================
+    # Final Message
+    # =========================================================
+
+    - name: Insecure configuration completed
+      debug:
+        msg: "Authentication & Authorization insecure state created"

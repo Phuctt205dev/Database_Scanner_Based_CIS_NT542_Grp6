@@ -1,0 +1,45 @@
+---
+- name: Remediation - Authentication Breaking Rules
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    result_file: "/home/truongtrongphuc/nt542-db_scanner-gr06/results/auth_and_authz_result.json"
+
+  tasks:
+
+    - name: Load auth_and_authz scan result
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ lookup('file', result_file) | from_json }}"
+
+    - name: Extract violated rules
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Rule 3.1 - Disable Mixed Mode Authentication
+      win_shell: |
+        $instance = "MSSQL16.SQLEXPRESS"
+
+        $regPath = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$instance\MSSQLServer"
+
+        Set-ItemProperty `
+          -Path $regPath `
+          -Name LoginMode `
+          -Value 1
+
+    - name: Restart SQL Server service
+      win_service:
+        name: MSSQL$SQLEXPRESS
+        state: restarted
+      when: "'3.1' in violated_rules"
+
+    - name: Breaking remediation completed
+      debug:
+        msg: "Breaking remediation completed"

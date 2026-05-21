@@ -1,0 +1,164 @@
+---
+- name: Remediate CIS Auditing and Logging
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    result_file: "../nt542-db_scanner-gr06/results/auditing_logging_result.json"
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  pre_tasks:
+
+    # =====================================================
+    # LOAD JSON RESULT
+    # =====================================================
+    - name: Load auditing scan result JSON
+      delegate_to: localhost
+      slurp:
+        src: "{{ result_file }}"
+      register: scan_json_raw
+
+    - name: Parse JSON result
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ scan_json_raw.content | b64decode | from_json }}"
+
+    - name: Extract violated rules
+      delegate_to: localhost
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Show violated rules
+      debug:
+        var: violated_rules
+
+
+  tasks:
+
+    # =====================================================
+    # RULE 5.1
+    # Ensure Maximum number of error log files >= 12
+    # =====================================================
+    - name: Remediate Rule 5.1
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        EXEC master.sys.xp_instance_regwrite
+            N'HKEY_LOCAL_MACHINE',
+            N'Software\Microsoft\MSSQLServer\MSSQLServer',
+            N'NumErrorLogs',
+            REG_DWORD,
+            12;
+        "
+      when: "'5.1' in violated_rules"
+      register: remediation_5_1
+
+    - name: Show remediation result 5.1
+      debug:
+        var: remediation_5_1.stdout
+      when: "'5.1' in violated_rules"
+
+
+    # =====================================================
+    # RULE 5.2
+    # Ensure Default Trace Enabled = 1
+    # =====================================================
+    - name: Remediate Rule 5.2
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        EXECUTE sp_configure 'show advanced options', 1;
+        RECONFIGURE;
+
+        EXECUTE sp_configure 'default trace enabled', 1;
+        RECONFIGURE;
+
+        EXECUTE sp_configure 'show advanced options', 0;
+        RECONFIGURE;
+        "
+      when: "'5.2' in violated_rules"
+      register: remediation_5_2
+
+    - name: Show remediation result 5.2
+      debug:
+        var: remediation_5_2.stdout
+      when: "'5.2' in violated_rules"
+
+
+    # =====================================================
+    # RULE 5.3
+    # Ensure Login Auditing = failed logins
+    # =====================================================
+    - name: Remediate Rule 5.3
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        EXEC xp_instance_regwrite
+            N'HKEY_LOCAL_MACHINE',
+            N'Software\Microsoft\MSSQLServer\MSSQLServer',
+            N'AuditLevel',
+            REG_DWORD,
+            2;
+        "
+      when: "'5.3' in violated_rules"
+      register: remediation_5_3
+
+    - name: Show remediation result 5.3
+      debug:
+        var: remediation_5_3.stdout
+      when: "'5.3' in violated_rules"
+
+
+    # =====================================================
+    # RULE 5.4
+    # Ensure SQL Server Audit is configured properly
+    # =====================================================
+    - name: Remediate Rule 5.4
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        IF NOT EXISTS (
+            SELECT *
+            FROM sys.server_audits
+            WHERE name = 'TrackLogins'
+        )
+        BEGIN
+            CREATE SERVER AUDIT TrackLogins
+            TO APPLICATION_LOG;
+        END;
+
+        IF NOT EXISTS (
+            SELECT *
+            FROM sys.server_audit_specifications
+            WHERE name = 'TrackAllLogins'
+        )
+        BEGIN
+            CREATE SERVER AUDIT SPECIFICATION TrackAllLogins
+            FOR SERVER AUDIT TrackLogins
+            ADD (FAILED_LOGIN_GROUP),
+            ADD (SUCCESSFUL_LOGIN_GROUP),
+            ADD (AUDIT_CHANGE_GROUP),
+            ADD (DATABASE_ROLE_MEMBER_CHANGE_GROUP),
+            ADD (SERVER_ROLE_MEMBER_CHANGE_GROUP),
+            ADD (SERVER_OPERATION_GROUP),
+            ADD (SUCCESSFUL_DATABASE_AUTHENTICATION_GROUP),
+            ADD (FAILED_DATABASE_AUTHENTICATION_GROUP)
+            WITH (STATE = ON);
+        END;
+
+        ALTER SERVER AUDIT TrackLogins
+        WITH (STATE = ON);
+
+        ALTER SERVER AUDIT SPECIFICATION TrackAllLogins
+        WITH (STATE = ON);
+        "
+      when: "'5.4' in violated_rules"
+      register: remediation_5_4
+
+    - name: Show remediation result 5.4
+      debug:
+        var: remediation_5_4.stdout
+      when: "'5.4' in violated_rules"

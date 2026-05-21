@@ -1,0 +1,306 @@
+---
+- name: Remediation - Authentication & Authorization (Safe Rules)
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    result_file: "/home/truongtrongphuc/nt542-db_scanner-gr06/results/auth_and_authz_result.json"
+
+  tasks:
+
+    # =========================================================
+    # Read scan result JSON
+    # =========================================================
+
+    - name: Load auth_and_authz scan result
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ lookup('file', result_file) | from_json }}"
+
+    # =========================================================
+    # Extract violated rules
+    # =========================================================
+
+    - name: Extract violated rules
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Show violated rules
+      debug:
+        var: violated_rules
+
+    # =========================================================
+    # Rule 3.2
+    # =========================================================
+
+    - name: Rule 3.2 - Revoke guest CONNECT
+      win_shell: |
+        $query = @"
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql += '
+        USE [' + name + '];
+        REVOKE CONNECT FROM guest;'
+        FROM sys.databases
+        WHERE name NOT IN ('master','tempdb','msdb');
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.2' in violated_rules"
+
+    # =========================================================
+    # Rule 3.3
+    # =========================================================
+
+    - name: Rule 3.3 - Drop orphaned users
+      win_shell: |
+        $query = @"
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        DECLARE @dbname SYSNAME;
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @dbname;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            DECLARE @inner_sql NVARCHAR(MAX) = '';
+
+            SET @inner_sql = '
+            USE [' + @dbname + '];
+
+            SELECT ''DROP USER ['' + dp.name + '']''
+            FROM sys.database_principals dp
+            LEFT JOIN sys.server_principals sp
+            ON dp.sid = sp.sid
+            WHERE sp.sid IS NULL
+            AND dp.authentication_type_desc = ''INSTANCE'';'
+
+            CREATE TABLE #tmp(cmd NVARCHAR(MAX));
+
+            INSERT INTO #tmp
+            EXEC(@inner_sql);
+
+            SELECT @sql += 'USE [' + @dbname + ']; ' + cmd + '; '
+            FROM #tmp;
+
+            DROP TABLE #tmp;
+
+            FETCH NEXT FROM db_cursor INTO @dbname;
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.3' in violated_rules"
+
+    # =========================================================
+    # Rule 3.4
+    # =========================================================
+
+    - name: Rule 3.4 - Drop contained DB SQL Auth users
+      win_shell: |
+        $query = @"
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        DECLARE @dbname SYSNAME;
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @dbname;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            DECLARE @inner_sql NVARCHAR(MAX) = '';
+
+            SET @inner_sql = '
+            USE [' + @dbname + '];
+
+            SELECT ''DROP USER ['' + name + '']''
+            FROM sys.database_principals
+            WHERE name NOT IN (''dbo'',''Information_Schema'',''sys'',''guest'')
+            AND type IN (''U'',''S'',''G'')
+            AND authentication_type = 2;'
+
+            CREATE TABLE #tmp(cmd NVARCHAR(MAX));
+
+            INSERT INTO #tmp
+            EXEC(@inner_sql);
+
+            SELECT @sql += 'USE [' + @dbname + ']; ' + cmd + '; '
+            FROM #tmp;
+
+            DROP TABLE #tmp;
+
+            FETCH NEXT FROM db_cursor INTO @dbname;
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.4' in violated_rules"
+
+    # =========================================================
+    # Rule 3.8
+    # =========================================================
+
+    - name: Rule 3.8 - Revoke dangerous permissions from public
+      win_shell: |
+        $query = @"
+        REVOKE VIEW SERVER STATE FROM public;
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -E -Q $query
+      when: "'3.8' in violated_rules"
+
+    # =========================================================
+    # Rule 3.9
+    # =========================================================
+
+    - name: Rule 3.9 - Remove BUILTIN logins
+      win_shell: |
+        $query = @"
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql += 'DROP LOGIN [' + name + ']; '
+        FROM sys.server_principals
+        WHERE name LIKE 'BUILTIN%';
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.9' in violated_rules"
+
+    # =========================================================
+    # Rule 3.10
+    # =========================================================
+
+    - name: Rule 3.10 - Remove local Windows groups
+      win_shell: |
+        $query = @"
+        DECLARE @machine NVARCHAR(255);
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SET @machine = CAST(SERVERPROPERTY('MachineName') AS NVARCHAR);
+
+        SELECT @sql += 'DROP LOGIN [' + name + ']; '
+        FROM sys.server_principals
+        WHERE type_desc = 'WINDOWS_GROUP'
+        AND name LIKE @machine + '%';
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.10' in violated_rules"
+
+    # =========================================================
+    # Rule 3.11
+    # =========================================================
+
+    - name: Rule 3.11 - Revoke public access to SQL Agent proxies
+      win_shell: |
+        $query = @"
+        USE msdb;
+
+        DECLARE @proxyname SYSNAME;
+
+        DECLARE proxy_cursor CURSOR FOR
+        SELECT sp.name
+        FROM dbo.sysproxylogin spl
+        JOIN sys.database_principals dp
+            ON dp.sid = spl.sid
+        JOIN sysproxies sp
+            ON sp.proxy_id = spl.proxy_id
+        WHERE principal_id = USER_ID('public');
+
+        OPEN proxy_cursor;
+
+        FETCH NEXT FROM proxy_cursor INTO @proxyname;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            EXEC dbo.sp_revoke_login_from_proxy
+                @name = 'public',
+                @proxy_name = @proxyname;
+
+            FETCH NEXT FROM proxy_cursor INTO @proxyname;
+        END
+
+        CLOSE proxy_cursor;
+        DEALLOCATE proxy_cursor;
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.11' in violated_rules"
+
+    # =========================================================
+    # Rule 3.13
+    # =========================================================
+
+    - name: Rule 3.13 - Remove dangerous msdb role memberships
+      win_shell: |
+        $query = @"
+        USE msdb;
+
+        DECLARE @sql NVARCHAR(MAX) = '';
+
+        SELECT @sql +=
+            'EXEC sp_droprolemember '''
+            + r.name + ''', ''' + m.name + '''; '
+        FROM sys.database_role_members drm
+        INNER JOIN sys.database_principals r
+            ON drm.role_principal_id = r.principal_id
+        INNER JOIN sys.database_principals m
+            ON drm.member_principal_id = m.principal_id
+        WHERE r.name IN (
+            'db_owner',
+            'db_securityadmin',
+            'db_ddladmin',
+            'db_datawriter'
+        )
+        AND m.name <> 'dbo';
+
+        EXEC(@sql);
+        "@
+
+        sqlcmd -S localhost\SQLEXPRESS -U {{ sql_username }} -P "{{ sql_password }}" -Q $query
+      when: "'3.13' in violated_rules"
+
+    # =========================================================
+    # Final Message
+    # =========================================================
+
+    - name: Remediation completed
+      debug:
+        msg: "Safe Authentication & Authorization remediation completed"

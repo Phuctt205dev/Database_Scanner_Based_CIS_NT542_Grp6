@@ -1,0 +1,171 @@
+---
+- name: Make SQL Server insecure for CIS Rule 6.2
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  tasks:
+
+    # =====================================================
+    # CREATE TEMP DIRECTORY
+    # =====================================================
+    - name: Create temp directory
+      win_file:
+        path: C:\Temp
+        state: directory
+
+
+    # =====================================================
+    # CREATE TEST DATABASE
+    # =====================================================
+    - name: Create CLR test database
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        IF DB_ID('CLRTestDB') IS NULL
+        BEGIN
+            CREATE DATABASE CLRTestDB;
+        END
+        "
+      register: create_db_result
+
+    - name: Show database creation result
+      debug:
+        var: create_db_result.stdout
+
+
+    # =====================================================
+    # ENABLE CLR
+    # =====================================================
+    - name: Enable CLR integration
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        EXEC sp_configure 'show advanced options', 1;
+        RECONFIGURE;
+
+        EXEC sp_configure 'clr enabled', 1;
+        RECONFIGURE;
+        "
+      register: clr_enable_result
+
+    - name: Show CLR enable result
+      debug:
+        var: clr_enable_result.stdout
+
+
+    # =====================================================
+    # ENABLE TRUSTWORTHY
+    # =====================================================
+    - name: Enable TRUSTWORTHY
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        ALTER DATABASE [CLRTestDB]
+        SET TRUSTWORTHY ON;
+        "
+      register: trustworthy_result
+
+    - name: Show trustworthy result
+      debug:
+        var: trustworthy_result.stdout
+
+
+    # =====================================================
+    # CREATE C# SOURCE FILE
+    # =====================================================
+    - name: Create C# source file
+      win_copy:
+        dest: C:\Temp\UnsafeAssembly.cs
+        content: |
+          using System;
+
+          public class UnsafeFunctions
+          {
+              public static int AddNumbers(int a, int b)
+              {
+                  return a + b;
+              }
+          }
+
+
+    # =====================================================
+    # COMPILE DLL
+    # =====================================================
+    - name: Compile CLR DLL
+      win_shell: >
+        & "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+        /target:library
+        /out:C:\Temp\UnsafeAssembly.dll
+        C:\Temp\UnsafeAssembly.cs
+      register: compile_result
+
+    - name: Show compile result
+      debug:
+        var: compile_result.stdout
+
+
+    # =====================================================
+    # DROP OLD ASSEMBLY
+    # =====================================================
+    - name: Drop old assembly if exists
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE [CLRTestDB];
+
+        IF EXISTS (
+            SELECT *
+            FROM sys.assemblies
+            WHERE name = 'UnsafeAssembly'
+        )
+        BEGIN
+            DROP ASSEMBLY UnsafeAssembly;
+        END
+        "
+      register: drop_result
+
+    - name: Show drop result
+      debug:
+        var: drop_result.stdout
+
+
+    # =====================================================
+    # CREATE UNSAFE ASSEMBLY
+    # =====================================================
+    - name: Create UNSAFE assembly
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE [CLRTestDB];
+
+        CREATE ASSEMBLY UnsafeAssembly
+        FROM 'C:\Temp\UnsafeAssembly.dll'
+        WITH PERMISSION_SET = UNSAFE;
+        "
+      register: create_assembly_result
+
+    - name: Show assembly creation result
+      debug:
+        var: create_assembly_result.stdout
+
+
+    # =====================================================
+    # VERIFY ASSEMBLY
+    # =====================================================
+    - name: Verify insecure assembly
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE [CLRTestDB];
+
+        SELECT
+            name,
+            permission_set_desc
+        FROM sys.assemblies
+        WHERE is_user_defined = 1;
+        "
+      register: verify_result
+
+    - name: Show verify result
+      debug:
+        var: verify_result.stdout

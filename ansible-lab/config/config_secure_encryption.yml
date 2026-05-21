@@ -1,0 +1,165 @@
+---
+- name: Configure Secure Encryption for CIS Rules 7.1 and 7.2
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  tasks:
+
+    # =====================================================
+    # CREATE DATABASE
+    # =====================================================
+    - name: Create EncryptionLab database
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+        IF DB_ID('EncryptionLab') IS NULL
+        BEGIN
+            CREATE DATABASE EncryptionLab;
+        END
+        "
+      register: create_db_result
+
+    - name: Show database result
+      debug:
+        var: create_db_result.stdout
+
+
+    # =====================================================
+    # CREATE DATABASE MASTER KEY
+    # =====================================================
+    - name: Create database master key
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        IF NOT EXISTS (
+            SELECT *
+            FROM sys.symmetric_keys
+            WHERE name = '##MS_DatabaseMasterKey##'
+        )
+        BEGIN
+            CREATE MASTER KEY
+            ENCRYPTION BY PASSWORD = 'StrongMasterKeyPassword123!';
+        END
+        "
+      register: masterkey_result
+
+    - name: Show master key result
+      debug:
+        var: masterkey_result.stdout
+
+
+    # =====================================================
+    # CREATE SECURE SYMMETRIC KEY
+    # RULE 7.1
+    # =====================================================
+    - name: Remove old symmetric key if exists
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        IF EXISTS (
+            SELECT *
+            FROM sys.symmetric_keys
+            WHERE name = 'SecureSymmetricKey'
+        )
+        BEGIN
+            DROP SYMMETRIC KEY SecureSymmetricKey;
+        END
+        "
+
+    - name: Create AES_256 symmetric key
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        CREATE SYMMETRIC KEY SecureSymmetricKey
+        WITH ALGORITHM = AES_256
+        ENCRYPTION BY PASSWORD = 'StrongSymmetricPassword123!';
+        "
+      register: symmetric_result
+
+    - name: Show symmetric key result
+      debug:
+        var: symmetric_result.stdout
+
+
+    # =====================================================
+    # CREATE SECURE ASYMMETRIC KEY
+    # RULE 7.2
+    # =====================================================
+    - name: Remove old asymmetric key if exists
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        IF EXISTS (
+            SELECT *
+            FROM sys.asymmetric_keys
+            WHERE name = 'SecureAsymKey'
+        )
+        BEGIN
+            DROP ASYMMETRIC KEY SecureAsymKey;
+        END
+        "
+
+    - name: Create RSA 2048 asymmetric key
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        CREATE ASYMMETRIC KEY SecureAsymKey
+        WITH ALGORITHM = RSA_2048;
+        "
+      register: asymmetric_result
+
+    - name: Show asymmetric key result
+      debug:
+        var: asymmetric_result.stdout
+
+
+    # =====================================================
+    # VERIFY CONFIGURATION
+    # =====================================================
+    - name: Verify symmetric keys
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        SELECT
+            name,
+            algorithm_desc
+        FROM sys.symmetric_keys;
+        "
+      register: verify_sym
+
+    - name: Show symmetric verification
+      debug:
+        var: verify_sym.stdout_lines
+
+
+    - name: Verify asymmetric keys
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        USE EncryptionLab;
+
+        SELECT
+            name,
+            key_length,
+            algorithm_desc
+        FROM sys.asymmetric_keys;
+        "
+      register: verify_asym
+
+    - name: Show asymmetric verification
+      debug:
+        var: verify_asym.stdout_lines

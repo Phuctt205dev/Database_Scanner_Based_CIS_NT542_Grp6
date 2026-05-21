@@ -1,0 +1,160 @@
+---
+- name: Remediate CIS Encryption Rules
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    result_file: "../nt542-db_scanner-gr06/results/encryption_result.json"
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  pre_tasks:
+
+    # =====================================================
+    # LOAD JSON RESULT
+    # =====================================================
+    - name: Load encryption scan result JSON
+      delegate_to: localhost
+      slurp:
+        src: "{{ result_file }}"
+      register: scan_json_raw
+
+    - name: Parse JSON result
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ scan_json_raw.content | b64decode | from_json }}"
+
+    - name: Extract violated rules
+      delegate_to: localhost
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Show violated rules
+      debug:
+        var: violated_rules
+
+
+  tasks:
+
+    # =====================================================
+    # RULE 7.1
+    # Ensure Symmetric Key is AES_128 or higher
+    # =====================================================
+    - name: Remediate Rule 7.1
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        DECLARE @db_name SYSNAME;
+        DECLARE @sql NVARCHAR(MAX);
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0
+          AND database_id > 4;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @db_name;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            SET @sql = '
+
+            USE [' + @db_name + '];
+
+            IF NOT EXISTS (
+                SELECT *
+                FROM sys.symmetric_keys
+                WHERE name = ''StrongSymmetricKey''
+            )
+            BEGIN
+
+                CREATE SYMMETRIC KEY StrongSymmetricKey
+                WITH ALGORITHM = AES_256
+                ENCRYPTION BY PASSWORD = ''StrongSymmetricPassword123!'';
+
+            END
+            ';
+
+            EXEC(@sql);
+
+            FETCH NEXT FROM db_cursor INTO @db_name;
+
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+        "
+      when: "'7.1' in violated_rules"
+      register: remediation_7_1
+
+    - name: Show remediation result 7.1
+      debug:
+        var: remediation_7_1.stdout
+      when: "'7.1' in violated_rules"
+
+
+    # =====================================================
+    # RULE 7.2
+    # Ensure Asymmetric Key Size >= 2048
+    # =====================================================
+    - name: Remediate Rule 7.2
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        DECLARE @db_name SYSNAME;
+        DECLARE @sql NVARCHAR(MAX);
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0
+          AND database_id > 4;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @db_name;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            SET @sql = '
+
+            USE [' + @db_name + '];
+
+            IF NOT EXISTS (
+                SELECT *
+                FROM sys.asymmetric_keys
+                WHERE name = ''StrongAsymmetricKey''
+            )
+            BEGIN
+
+                CREATE ASYMMETRIC KEY StrongAsymmetricKey
+                WITH ALGORITHM = RSA_2048;
+
+            END
+            ';
+
+            EXEC(@sql);
+
+            FETCH NEXT FROM db_cursor INTO @db_name;
+
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+        "
+      when: "'7.2' in violated_rules"
+      register: remediation_7_2
+
+    - name: Show remediation result 7.2
+      debug:
+        var: remediation_7_2.stdout
+      when: "'7.2' in violated_rules"

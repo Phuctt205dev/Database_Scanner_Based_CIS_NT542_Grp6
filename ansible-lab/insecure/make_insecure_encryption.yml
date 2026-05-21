@@ -1,0 +1,152 @@
+---
+- name: Make Encryption Rules Insecure
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  tasks:
+
+    # =====================================================
+    # RULE 7.1
+    # REMOVE SECURE SYMMETRIC KEYS
+    # =====================================================
+    - name: Make Rule 7.1 insecure
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        DECLARE @db_name SYSNAME;
+        DECLARE @sql NVARCHAR(MAX);
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0
+          AND database_id > 4;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @db_name;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            SET @sql = '
+
+            USE [' + @db_name + '];
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.symmetric_keys
+                WHERE name = ''StrongSymmetricKey''
+            )
+            BEGIN
+                DROP SYMMETRIC KEY StrongSymmetricKey;
+            END
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.symmetric_keys
+                WHERE name = ''SecureSymmetricKey''
+            )
+            BEGIN
+                DROP SYMMETRIC KEY SecureSymmetricKey;
+            END
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.symmetric_keys
+                WHERE name = ''SymmetricKey''
+            )
+            BEGIN
+                DROP SYMMETRIC KEY SymmetricKey;
+            END
+            ';
+
+            EXEC(@sql);
+
+            FETCH NEXT FROM db_cursor INTO @db_name;
+
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+        "
+      register: insecure_7_1
+
+    - name: Show insecure result 7.1
+      debug:
+        var: insecure_7_1.stdout
+
+
+    # =====================================================
+    # RULE 7.2
+    # REMOVE SECURE ASYMMETRIC KEYS
+    # =====================================================
+    - name: Make Rule 7.2 insecure
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        DECLARE @db_name SYSNAME;
+        DECLARE @sql NVARCHAR(MAX);
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0
+          AND database_id > 4;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @db_name;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            SET @sql = '
+
+            USE [' + @db_name + '];
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.asymmetric_keys
+                WHERE name = ''StrongAsymmetricKey''
+            )
+            BEGIN
+                DROP ASYMMETRIC KEY StrongAsymmetricKey;
+            END
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.asymmetric_keys
+                WHERE name = ''SecureAsymKey''
+            )
+            BEGIN
+                DROP ASYMMETRIC KEY SecureAsymKey;
+            END
+
+            IF EXISTS (
+                SELECT *
+                FROM sys.asymmetric_keys
+                WHERE name = ''WeakAsymKey''
+            )
+            BEGIN
+                DROP ASYMMETRIC KEY WeakAsymKey;
+            END
+            ';
+
+            EXEC(@sql);
+
+            FETCH NEXT FROM db_cursor INTO @db_name;
+
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+        "
+      register: insecure_7_2
+
+    - name: Show insecure result 7.2
+      debug:
+        var: insecure_7_2.stdout

@@ -1,0 +1,117 @@
+---
+- name: Remediate CIS Application Development
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    result_file: "../nt542-db_scanner-gr06/results/application_development_result.json"
+    sql_instance: "localhost\\SQLEXPRESS"
+
+  pre_tasks:
+
+    # =====================================================
+    # LOAD JSON RESULT
+    # =====================================================
+    - name: Load application development scan result JSON
+      delegate_to: localhost
+      slurp:
+        src: "{{ result_file }}"
+      register: scan_json_raw
+
+    - name: Parse JSON result
+      delegate_to: localhost
+      set_fact:
+        scan_results: "{{ scan_json_raw.content | b64decode | from_json }}"
+
+    - name: Extract violated rules
+      delegate_to: localhost
+      set_fact:
+        violated_rules: >-
+          {{
+            scan_results
+            | selectattr('status', 'equalto', 'Violate')
+            | map(attribute='rule_id')
+            | list
+          }}
+
+    - name: Show violated rules
+      debug:
+        var: violated_rules
+
+
+  tasks:
+
+    # =====================================================
+    # RULE 6.2
+    # Ensure CLR Assembly Permission Set = SAFE_ACCESS
+    # =====================================================
+    - name: Remediate Rule 6.2
+      win_shell: |
+        sqlcmd -S "{{ sql_instance }}" -U "{{ sql_username }}" -P "{{ sql_password }}" -Q "
+
+        DECLARE @db_name SYSNAME;
+        DECLARE @sql NVARCHAR(MAX);
+
+        DECLARE db_cursor CURSOR FOR
+        SELECT name
+        FROM sys.databases
+        WHERE state = 0;
+
+        OPEN db_cursor;
+
+        FETCH NEXT FROM db_cursor INTO @db_name;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+
+            SET @sql = '
+            USE [' + @db_name + '];
+
+            DECLARE @assembly_name SYSNAME;
+            DECLARE @inner_sql NVARCHAR(MAX);
+
+            DECLARE assembly_cursor CURSOR FOR
+            SELECT name
+            FROM sys.assemblies
+            WHERE is_user_defined = 1
+              AND name <> ''Microsoft.SqlServer.Types''
+              AND permission_set_desc <> ''SAFE_ACCESS'';
+
+            OPEN assembly_cursor;
+
+            FETCH NEXT FROM assembly_cursor
+            INTO @assembly_name;
+
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+
+                SET @inner_sql = ''
+                ALTER ASSEMBLY ['' + @assembly_name + '']
+                WITH PERMISSION_SET = SAFE;
+                '';
+
+                EXEC(@inner_sql);
+
+                FETCH NEXT FROM assembly_cursor
+                INTO @assembly_name;
+            END
+
+            CLOSE assembly_cursor;
+            DEALLOCATE assembly_cursor;
+            ';
+
+            EXEC(@sql);
+
+            FETCH NEXT FROM db_cursor INTO @db_name;
+        END
+
+        CLOSE db_cursor;
+        DEALLOCATE db_cursor;
+        "
+      when: "'6.2' in violated_rules"
+      register: remediation_6_2
+
+    - name: Show remediation result 6.2
+      debug:
+        var: remediation_6_2.stdout
+      when: "'6.2' in violated_rules"
