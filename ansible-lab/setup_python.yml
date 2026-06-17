@@ -1,0 +1,30 @@
+---
+- name: Setup CIS Scanner Environment
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    remote_scan_dir: "C:\\cis_scanner"
+
+  tasks:
+
+    - name: Create scanner directory
+      win_file:
+        path: "{{ remote_scan_dir }}"
+        state: directory
+
+    - name: Copy scanner files
+      win_copy:
+        src: ../nt542-db_scanner-gr06/
+        dest: "{{ remote_scan_dir }}"
+
+    - name: Install pyodbc
+      win_shell: |
+        pip install pyodbc
+
+    - name: Verify Python
+      win_shell: python --version
+      register: pyver
+
+    - debug:
+        var: pyver.stdout

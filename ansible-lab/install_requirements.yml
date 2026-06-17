@@ -1,0 +1,29 @@
+---
+- name: Install Python Requirements
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    remote_scan_dir: "C:\\cis_scanner"
+
+  tasks:
+
+    # ==========================================
+    # UPGRADE PIP
+    # ==========================================
+
+    - name: Upgrade pip
+      win_shell: |
+        python -m pip install --upgrade pip
+      args:
+        chdir: "{{ remote_scan_dir }}"
+
+    # ==========================================
+    # INSTALL REQUIREMENTS
+    # ==========================================
+
+    - name: Install requirements.txt
+      win_shell: |
+        python -m pip install -r requirements.txt
+      args:
+        chdir: "{{ remote_scan_dir }}"

@@ -1,0 +1,27 @@
+---
+- name: Deploy CIS Scanner
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    remote_scan_dir: "C:\\cis_scanner"
+
+  tasks:
+
+    # ==========================================
+    # CREATE SCANNER DIRECTORY
+    # ==========================================
+
+    - name: Create scanner directory
+      win_file:
+        path: "{{ remote_scan_dir }}"
+        state: directory
+
+    # ==========================================
+    # COPY SCANNER PROJECT
+    # ==========================================
+
+    - name: Copy scanner project
+      win_copy:
+        src: "../nt542-db_scanner-gr06/"
+        dest: "{{ remote_scan_dir }}\\"
