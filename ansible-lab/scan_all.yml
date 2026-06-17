@@ -1,0 +1,90 @@
+---
+- name: Run CIS SQL Server Scanner
+  hosts: sqlservers
+  gather_facts: no
+
+  vars:
+    remote_scan_dir: "C:\\cis_scanner"
+    remote_result_dir: "C:\\cis_scanner\\results"
+
+  tasks:
+
+    # ==========================================
+    # CREATE RESULT DIRECTORY
+    # ==========================================
+
+    - name: Create result directory
+      win_file:
+        path: "{{ remote_result_dir }}"
+        state: directory
+
+    # ==========================================
+    # REMOVE OLD RESULT FILE
+    # ==========================================
+
+    - name: Remove old scan result
+      win_file:
+        path: "{{ remote_result_dir }}\\full_scan_result.json"
+        state: absent
+
+    # ==========================================
+    # RUN CIS SCANNER
+    # ==========================================
+
+    - name: Run CIS scanner
+      win_shell: |
+        chcp 65001 > $null
+
+        python "{{ remote_scan_dir }}\db_scan.py" `
+          --server localhost `
+          --port {{ sql_port }} `
+          --database master `
+          --username "{{ sql_username }}" `
+          --password "{{ sql_password }}" `
+          --module all `
+          --output "{{ remote_result_dir }}\full_scan_result.json"
+      args:
+        chdir: "{{ remote_scan_dir }}"
+      register: scan_output
+
+    # ==========================================
+    # SHOW SCANNER OUTPUT
+    # ==========================================
+
+    - name: Show scanner output
+      debug:
+        var: scan_output.stdout_lines
+
+    # ==========================================
+    # VERIFY RESULT FILE EXISTS
+    # ==========================================
+
+    - name: Check result file
+      win_stat:
+        path: "{{ remote_result_dir }}\\full_scan_result.json"
+      register: result_file
+
+    - name: Fail if result missing
+      fail:
+        msg: "Scanner did not generate full_scan_result.json"
+      when: not result_file.stat.exists
+
+    # ==========================================
+    # REMOVE OLD FETCHED RESULT
+    # ==========================================
+
+    - name: Remove old fetched result
+      file:
+        path: "./results/{{ inventory_hostname }}_full_scan_result.json"
+        state: absent
+      delegate_to: localhost
+
+    # ==========================================
+    # FETCH RESULT
+    # ==========================================
+
+    - name: Fetch scan result
+      fetch:
+        src: "{{ remote_result_dir }}\\full_scan_result.json"
+        dest: "./results/{{ inventory_hostname }}_full_scan_result.json"
+        flat: yes

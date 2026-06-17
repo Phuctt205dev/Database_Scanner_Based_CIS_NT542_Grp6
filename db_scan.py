@@ -2,6 +2,16 @@ import json
 import argparse
 import pyodbc
 import os
+import sys
+import io   # 🔥 FIX 1: thiếu import
+
+# 🔥 FIX 2: ép UTF-8 an toàn (Windows fix)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 
 from scanner.surface_area import scan_surface_area
 from scanner.auth_and_authz import scan_auth_and_authz
@@ -27,7 +37,6 @@ def connect_sql_server(server, port, database, username, password):
 
 
 def print_banner():
-
     print("=" * 50)
     print(" CIS Microsoft SQL Server 2022 Scanner ")
     print("=" * 50)
@@ -37,15 +46,8 @@ def print_summary(results):
 
     total = len(results)
 
-    compliant = len([
-        r for r in results
-        if r["status"] == "Compliance"
-    ])
-
-    violate = len([
-        r for r in results
-        if r["status"] == "Violate"
-    ])
+    compliant = len([r for r in results if r["status"] == "Compliance"])
+    violate = len([r for r in results if r["status"] == "Violate"])
 
     print("\n========== SUMMARY ==========")
     print(f"Total Rules : {total}")
@@ -56,8 +58,10 @@ def print_summary(results):
 
 def export_json(results, output_path):
 
+    # 🔥 FIX 3: đảm bảo folder tồn tại chắc chắn
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
+    # 🔥 FIX 4: safe write
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=4, ensure_ascii=False)
 
@@ -78,54 +82,19 @@ def get_output_path(module_name):
         "all": "results/full_scan_result.json"
     }
 
-    return output_map.get(
-        module_name,
-        "results/scan_result.json"
-    )
+    return output_map.get(module_name, "results/scan_result.json")
 
 
 def main():
 
-    parser = argparse.ArgumentParser(
-        description="CIS SQL Server 2022 Scanner"
-    )
+    parser = argparse.ArgumentParser(description="CIS SQL Server 2022 Scanner")
 
-    parser.add_argument(
-        "--server",
-        required=True,
-        help="SQL Server IP or hostname"
-    )
-
-    parser.add_argument(
-        "--port",
-        default="1433",
-        help="SQL Server port"
-    )
-
-    parser.add_argument(
-        "--database",
-        default="master",
-        help="Database name"
-    )
-
-    parser.add_argument(
-        "--username",
-        required=True,
-        help="SQL login username"
-    )
-
-    parser.add_argument(
-        "--password",
-        required=True,
-        help="SQL login password"
-    )
-
-    parser.add_argument(
-        "--output",
-        default=None,
-        help="Custom output JSON file"
-    )
-
+    parser.add_argument("--server", required=True)
+    parser.add_argument("--port", default="1433")
+    parser.add_argument("--database", default="master")
+    parser.add_argument("--username", required=True)
+    parser.add_argument("--password", required=True)
+    parser.add_argument("--output", default=None)
     parser.add_argument(
         "--module",
         choices=[
@@ -137,8 +106,7 @@ def main():
             "encryption",
             "all"
         ],
-        default="all",
-        help="Select scan module"
+        default="all"
     )
 
     args = parser.parse_args()
@@ -163,76 +131,40 @@ def main():
 
         all_results = []
 
-        # ==========================================
-        # SURFACE AREA
-        # ==========================================
+        # ================= SURFACE AREA =================
         if args.module in ["surface_area", "all"]:
-
             print("[*] Running Surface Area Reduction scan...")
+            all_results.extend(scan_surface_area(cursor))
 
-            surface_results = scan_surface_area(cursor)
-
-            all_results.extend(surface_results)
-
-        # ==========================================
-        # AUTH & AUTHZ
-        # ==========================================
+        # ================= AUTH =================
         if args.module in ["auth_and_authz", "all"]:
-
             print("[*] Running Authentication & Authorization scan...")
+            all_results.extend(scan_auth_and_authz(cursor))
 
-            auth_results = scan_auth_and_authz(cursor)
-
-            all_results.extend(auth_results)
-
-        # ==========================================
-        # PASSWORD POLICIES
-        # ==========================================
+        # ================= PASSWORD =================
         if args.module in ["password_policies", "all"]:
-
             print("[*] Running Password Policies scan...")
+            all_results.extend(scan_password_policies(cursor))
 
-            password_results = scan_password_policies(cursor)
-
-            all_results.extend(password_results)
-
-        # ==========================================
-        # AUDITING & LOGGING
-        # ==========================================
+        # ================= AUDIT =================
         if args.module in ["auditing_logging", "all"]:
-
             print("[*] Running Auditing & Logging scan...")
+            all_results.extend(scan_auditing_logging(cursor))
 
-            auditing_results = scan_auditing_logging(cursor)
-
-            all_results.extend(auditing_results)
-
-        # ==========================================
-        # APPLICATION DEVELOPMENT
-        # ==========================================
+        # ================= APP DEV =================
         if args.module in ["application_development", "all"]:
-
             print("[*] Running Application Development scan...")
+            all_results.extend(scan_application_development(cursor))
 
-            application_results = scan_application_development(cursor)
-
-            all_results.extend(application_results)
-
-        # ==========================================
-        # ENCRYPTION
-        # ==========================================
+        # ================= ENCRYPTION =================
         if args.module in ["encryption", "all"]:
-
             print("[*] Running Encryption scan...")
+            all_results.extend(scan_encryption(cursor))
 
-            encryption_results = scan_encryption(cursor)
-
-            all_results.extend(encryption_results)
-
+        # ================= PRINT =================
         print("\n========== RESULT ==========\n")
 
         for item in all_results:
-
             print(f"[{item['status']}] Rule {item['rule_id']}")
             print(f"Policy : {item['policy']}")
             print(f"Details: {item['details']}")
@@ -240,28 +172,20 @@ def main():
 
         print_summary(all_results)
 
-        output_path = (
-            args.output
-            if args.output
-            else get_output_path(args.module)
-        )
+        output_path = args.output if args.output else get_output_path(args.module)
 
-        export_json(
-            all_results,
-            output_path
-        )
+        # 🔥 IMPORTANT: luôn export dù ít data
+        export_json(all_results, output_path)
 
         conn.close()
 
         print("[+] Scan completed")
 
     except pyodbc.Error as e:
-
         print("\n[DATABASE ERROR]")
         print(str(e))
 
     except Exception as e:
-
         print("\n[ERROR]")
         print(str(e))
 
