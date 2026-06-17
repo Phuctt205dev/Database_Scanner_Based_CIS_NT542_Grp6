@@ -1,6 +1,8 @@
 import subprocess
 import sys
 import json
+import os
+import glob
 
 
 # ==========================================
@@ -15,15 +17,16 @@ RESET = "\033[0m"
 
 
 # ==========================================
-# CONFIG
+# PATH CONFIG
 # ==========================================
 
-SERVER = "192.168.152.144"
-PORT = "51433"
-DATABASE = "master"
+ANSIBLE_DIR = "../ansible-lab"
 
-USERNAME = "scanner_user"
-PASSWORD = "StrongPassword123!"
+# File scan gốc do scan_all.yml fetch về
+REMOTE_RESULT_DIR = f"{ANSIBLE_DIR}/results"
+
+# 6 file json cho remediation đọc
+LOCAL_RESULT_DIR = "results"
 
 
 # ==========================================
@@ -32,52 +35,45 @@ PASSWORD = "StrongPassword123!"
 
 module_map = {
 
-    "1.": "surface_area_result.json",
+    "2.": "surface_area_result.json",
 
-    "2.": "auth_and_authz_result.json",
+    "3.": "auth_and_authz_result.json",
 
-    "3.": "password_policies_result.json",
+    "4.": "password_policies_result.json",
 
-    "4.": "auditing_logging_result.json",
+    "5.": "auditing_logging_result.json",
 
-    "5.": "application_development_result.json",
+    "6.": "application_development_result.json",
 
-    "6.": "encryption_result.json"
+    "7.": "encryption_result.json"
 }
 
 
 # ==========================================
-# RUN FULL SCAN
+# CREATE RESULT DIRECTORY
 # ==========================================
 
-print(f"\n{CYAN}[1] Running full scan...{RESET}\n")
+os.makedirs(LOCAL_RESULT_DIR, exist_ok=True)
+
+
+# ==========================================
+# RUN FULL SCAN VIA ANSIBLE
+# ==========================================
+
+print(f"\n{CYAN}[1] Running full scan via Ansible...{RESET}\n")
 
 scan_command = [
 
-    "python3",
+    "ansible-playbook",
 
-    "db_scan.py",
+    "-i",
 
-    "--server", SERVER,
+    f"{ANSIBLE_DIR}/inventory.ini",
 
-    "--port", PORT,
-
-    "--database", DATABASE,
-
-    "--username", USERNAME,
-
-    "--password", PASSWORD,
-
-    "--module", "all",
-
-    "--output", "results/full_scan_result.json"
+    f"{ANSIBLE_DIR}/scan_all.yml"
 ]
 
-scan_process = subprocess.run(
-    scan_command,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL
-)
+scan_process = subprocess.run(scan_command)
 
 if scan_process.returncode != 0:
 
@@ -87,11 +83,33 @@ if scan_process.returncode != 0:
 
 
 # ==========================================
+# FIND FETCHED RESULT FILE
+# ==========================================
+
+result_files = glob.glob(
+    f"{REMOTE_RESULT_DIR}/*_full_scan_result.json"
+)
+
+if len(result_files) == 0:
+
+    print(f"{RED}[ERROR] No scan result JSON found{RESET}")
+
+    sys.exit(1)
+
+result_path = result_files[0]
+
+print(
+    f"{GREEN}[+] Using result file:{RESET} "
+    f"{result_path}"
+)
+
+
+# ==========================================
 # LOAD RESULTS
 # ==========================================
 
 with open(
-    "results/full_scan_result.json",
+    result_path,
     "r",
     encoding="utf-8"
 ) as f:
@@ -212,9 +230,18 @@ for item in all_results:
             split_results[filename].append(item)
 
 
+# ==========================================
+# UPDATE LOCAL JSON FILES
+# IMPORTANT:
+# Remediation playbooks đọc file ở:
+# ~/project/nt542-db_scanner-gr06/results
+# ==========================================
+
 for filename, data in split_results.items():
 
-    output_path = f"results/{filename}"
+    output_path = (
+        f"{LOCAL_RESULT_DIR}/{filename}"
+    )
 
     with open(
         output_path,
@@ -230,7 +257,26 @@ for filename, data in split_results.items():
         )
 
     print(
-        f"{GREEN}[+] Updated {output_path}{RESET}"
+        f"{GREEN}[+] Updated:{RESET} "
+        f"{output_path}"
+    )
+
+
+# ==========================================
+# SAVE FULL RESULT LOCALLY
+# ==========================================
+
+with open(
+    f"{LOCAL_RESULT_DIR}/full_scan_result.json",
+    "w",
+    encoding="utf-8"
+) as f:
+
+    json.dump(
+        all_results,
+        f,
+        indent=4,
+        ensure_ascii=False
     )
 
 
@@ -248,14 +294,12 @@ report_command = [
 
     "report_generator.py",
 
-    "results/full_scan_result.json",
+    f"{LOCAL_RESULT_DIR}/full_scan_result.json",
 
-    "results/full_report.html"
+    f"{LOCAL_RESULT_DIR}/full_report.html"
 ]
 
-report_process = subprocess.run(
-    report_command
-)
+report_process = subprocess.run(report_command)
 
 if report_process.returncode != 0:
 
@@ -289,17 +333,17 @@ if choice.upper() != "Y":
 
 playbooks = [
 
-    "../ansible-lab/remediation_surface_area.yml",
+    f"{ANSIBLE_DIR}/remediation_surface_area.yml",
 
-    "../ansible-lab/remediation_auth_safe.yml",
+    f"{ANSIBLE_DIR}/remediation_auth_safe.yml",
 
-    "../ansible-lab/remediation_password_policies.yml",
+    f"{ANSIBLE_DIR}/remediation_password_policies.yml",
 
-    "../ansible-lab/remediation_auditing_logging.yml",
+    f"{ANSIBLE_DIR}/remediation_auditing_logging.yml",
 
-    "../ansible-lab/remediation_application_development.yml",
+    f"{ANSIBLE_DIR}/remediation_application_development.yml",
 
-    "../ansible-lab/remediation_encryption.yml"
+    f"{ANSIBLE_DIR}/remediation_encryption.yml"
 ]
 
 
@@ -323,7 +367,7 @@ for playbook in playbooks:
 
         "-i",
 
-        "../ansible-lab/inventory.ini",
+        f"{ANSIBLE_DIR}/inventory.ini",
 
         playbook
     ]
@@ -347,34 +391,9 @@ print(
     f"\n{CYAN}[5] Running re-scan...{RESET}\n"
 )
 
-final_scan_command = [
+rescan_process = subprocess.run(scan_command)
 
-    "python3",
-
-    "db_scan.py",
-
-    "--server", SERVER,
-
-    "--port", PORT,
-
-    "--database", DATABASE,
-
-    "--username", USERNAME,
-
-    "--password", PASSWORD,
-
-    "--module", "all",
-
-    "--output", "results/final_scan_result.json"
-]
-
-final_scan_process = subprocess.run(
-    final_scan_command,
-    stdout=subprocess.DEVNULL,
-    stderr=subprocess.DEVNULL
-)
-
-if final_scan_process.returncode != 0:
+if rescan_process.returncode != 0:
 
     print(
         f"{RED}[ERROR] Re-scan failed{RESET}"
@@ -384,11 +403,30 @@ if final_scan_process.returncode != 0:
 
 
 # ==========================================
+# FIND FINAL RESULT
+# ==========================================
+
+result_files = glob.glob(
+    f"{REMOTE_RESULT_DIR}/*_full_scan_result.json"
+)
+
+if len(result_files) == 0:
+
+    print(
+        f"{RED}[ERROR] No final scan result JSON found{RESET}"
+    )
+
+    sys.exit(1)
+
+final_result_path = result_files[0]
+
+
+# ==========================================
 # LOAD FINAL RESULTS
 # ==========================================
 
 with open(
-    "results/final_scan_result.json",
+    final_result_path,
     "r",
     encoding="utf-8"
 ) as f:
@@ -397,7 +435,7 @@ with open(
 
 
 # ==========================================
-# PRINT FINAL RESULT WITH COLORS
+# PRINT FINAL RESULT
 # ==========================================
 
 print(f"\n{CYAN}====== FINAL RESULT ======{RESET}\n")
@@ -521,7 +559,9 @@ for item in final_results:
 
 for filename, data in split_results.items():
 
-    output_path = f"results/{filename}"
+    output_path = (
+        f"{LOCAL_RESULT_DIR}/{filename}"
+    )
 
     with open(
         output_path,
@@ -537,7 +577,26 @@ for filename, data in split_results.items():
         )
 
     print(
-        f"{GREEN}[+] Updated {output_path}{RESET}"
+        f"{GREEN}[+] Updated:{RESET} "
+        f"{output_path}"
+    )
+
+
+# ==========================================
+# SAVE FINAL RESULT
+# ==========================================
+
+with open(
+    f"{LOCAL_RESULT_DIR}/final_scan_result.json",
+    "w",
+    encoding="utf-8"
+) as f:
+
+    json.dump(
+        final_results,
+        f,
+        indent=4,
+        ensure_ascii=False
     )
 
 
@@ -555,9 +614,9 @@ final_report_command = [
 
     "report_generator.py",
 
-    "results/final_scan_result.json",
+    f"{LOCAL_RESULT_DIR}/final_scan_result.json",
 
-    "results/final_report.html"
+    f"{LOCAL_RESULT_DIR}/final_report.html"
 ]
 
 final_report_process = subprocess.run(
